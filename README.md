@@ -1,11 +1,11 @@
-# T3 Code
+# AM40 AppMachine Builder 4.0
 
-T3 Code is a minimal web GUI for coding agents. Currently Codex-first, with Claude Code support coming soon.
+AM40 is a minimal web GUI for coding agents. Currently Codex-first, with Claude Code support coming soon.
 
 ## How to use
 
 > [!WARNING]
-> You need to have [Codex CLI](https://github.com/openai/codex) installed and authorized for T3 Code to work.
+> You need to have [Codex CLI](https://github.com/openai/codex) installed and authorized for AM40 to work.
 
 ```bash
 npx t3
