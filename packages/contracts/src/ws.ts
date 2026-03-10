@@ -8,6 +8,12 @@ import {
   OrchestrationGetSnapshotInput,
   OrchestrationGetTurnDiffInput,
   OrchestrationReplayEventsInput,
+  KANBAN_WS_METHODS,
+  KanbanListInput,
+  KanbanCreateInput,
+  KanbanUpdateInput,
+  KanbanMoveInput,
+  KanbanDeleteInput,
 } from "./orchestration";
 import {
   GitCheckoutInput,
@@ -16,11 +22,19 @@ import {
   GitCreateWorktreeInput,
   GitInitInput,
   GitListBranchesInput,
+  GitMergeFromInput,
+  GitMergeIntoInput,
+  GitOverwriteInput,
   GitPullInput,
   GitPullRequestRefInput,
   GitRemoveWorktreeInput,
+  GitResetInput,
   GitRunStackedActionInput,
+  GitSaveInput,
   GitStatusInput,
+  SpotlightDisableInput,
+  SpotlightEnableInput,
+  SpotlightStatusInput,
 } from "./git";
 import {
   TerminalClearInput,
@@ -33,6 +47,7 @@ import {
 import { KeybindingRule } from "./keybindings";
 import { ProjectSearchEntriesInput, ProjectWriteFileInput } from "./project";
 import { OpenInEditorInput } from "./editor";
+import { RepoAddInput, RepoListInput, RepoRemoveInput, RepoSetActiveInput } from "./repo";
 
 // ── WebSocket RPC Method Names ───────────────────────────────────────
 
@@ -59,6 +74,16 @@ export const WS_METHODS = {
   gitInit: "git.init",
   gitResolvePullRequest: "git.resolvePullRequest",
   gitPreparePullRequestThread: "git.preparePullRequestThread",
+  gitSave: "git.save",
+  gitMergeFrom: "git.mergeFrom",
+  gitMergeInto: "git.mergeInto",
+  gitOverwrite: "git.overwrite",
+  gitReset: "git.reset",
+
+  // Spotlight methods
+  spotlightEnable: "spotlight.enable",
+  spotlightDisable: "spotlight.disable",
+  spotlightStatus: "spotlight.status",
 
   // Terminal methods
   terminalOpen: "terminal.open",
@@ -67,6 +92,12 @@ export const WS_METHODS = {
   terminalClear: "terminal.clear",
   terminalRestart: "terminal.restart",
   terminalClose: "terminal.close",
+
+  // Repo methods
+  repoList: "repo.list",
+  repoAdd: "repo.add",
+  repoRemove: "repo.remove",
+  repoSetActive: "repo.setActive",
 
   // Server meta
   serverGetConfig: "server.getConfig",
@@ -79,6 +110,7 @@ export const WS_CHANNELS = {
   terminalEvent: "terminal.event",
   serverWelcome: "server.welcome",
   serverConfigUpdated: "server.configUpdated",
+  spotlightSync: "spotlight.sync",
 } as const;
 
 // -- Tagged Union of all request body schemas ─────────────────────────
@@ -123,6 +155,16 @@ const WebSocketRequestBody = Schema.Union([
   tagRequestBody(WS_METHODS.gitInit, GitInitInput),
   tagRequestBody(WS_METHODS.gitResolvePullRequest, GitPullRequestRefInput),
   tagRequestBody(WS_METHODS.gitPreparePullRequestThread, GitPreparePullRequestThreadInput),
+  tagRequestBody(WS_METHODS.gitSave, GitSaveInput),
+  tagRequestBody(WS_METHODS.gitMergeFrom, GitMergeFromInput),
+  tagRequestBody(WS_METHODS.gitMergeInto, GitMergeIntoInput),
+  tagRequestBody(WS_METHODS.gitOverwrite, GitOverwriteInput),
+  tagRequestBody(WS_METHODS.gitReset, GitResetInput),
+
+  // Spotlight methods
+  tagRequestBody(WS_METHODS.spotlightEnable, SpotlightEnableInput),
+  tagRequestBody(WS_METHODS.spotlightDisable, SpotlightDisableInput),
+  tagRequestBody(WS_METHODS.spotlightStatus, SpotlightStatusInput),
 
   // Terminal methods
   tagRequestBody(WS_METHODS.terminalOpen, TerminalOpenInput),
@@ -132,9 +174,22 @@ const WebSocketRequestBody = Schema.Union([
   tagRequestBody(WS_METHODS.terminalRestart, TerminalRestartInput),
   tagRequestBody(WS_METHODS.terminalClose, TerminalCloseInput),
 
+  // Repo methods
+  tagRequestBody(WS_METHODS.repoList, RepoListInput),
+  tagRequestBody(WS_METHODS.repoAdd, RepoAddInput),
+  tagRequestBody(WS_METHODS.repoRemove, RepoRemoveInput),
+  tagRequestBody(WS_METHODS.repoSetActive, RepoSetActiveInput),
+
   // Server meta
   tagRequestBody(WS_METHODS.serverGetConfig, Schema.Struct({})),
   tagRequestBody(WS_METHODS.serverUpsertKeybinding, KeybindingRule),
+
+  // Kanban methods
+  tagRequestBody(KANBAN_WS_METHODS.list, KanbanListInput),
+  tagRequestBody(KANBAN_WS_METHODS.create, KanbanCreateInput),
+  tagRequestBody(KANBAN_WS_METHODS.update, KanbanUpdateInput),
+  tagRequestBody(KANBAN_WS_METHODS.move, KanbanMoveInput),
+  tagRequestBody(KANBAN_WS_METHODS.delete, KanbanDeleteInput),
 ]);
 
 export const WebSocketRequest = Schema.Struct({

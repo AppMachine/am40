@@ -9,6 +9,8 @@ import {
   WS_CHANNELS,
   WS_METHODS,
   WsWelcomePayload,
+  KANBAN_WS_METHODS,
+  KANBAN_WS_CHANNELS,
 } from "@t3tools/contracts";
 import { Cause, Schema } from "effect";
 
@@ -173,6 +175,22 @@ export function createWsNativeApi(): NativeApi {
       resolvePullRequest: (input) => transport.request(WS_METHODS.gitResolvePullRequest, input),
       preparePullRequestThread: (input) =>
         transport.request(WS_METHODS.gitPreparePullRequestThread, input),
+      save: (input) => transport.request(WS_METHODS.gitSave, input),
+      mergeFrom: (input) => transport.request(WS_METHODS.gitMergeFrom, input),
+      mergeInto: (input) => transport.request(WS_METHODS.gitMergeInto, input),
+      overwrite: (input) => transport.request(WS_METHODS.gitOverwrite, input),
+      reset: (input) => transport.request(WS_METHODS.gitReset, input),
+    },
+    spotlight: {
+      enable: (input) => transport.request(WS_METHODS.spotlightEnable, input),
+      disable: (input) => transport.request(WS_METHODS.spotlightDisable, input),
+      status: (input) => transport.request(WS_METHODS.spotlightStatus, input),
+    },
+    repo: {
+      list: () => transport.request(WS_METHODS.repoList),
+      add: (input) => transport.request(WS_METHODS.repoAdd, input),
+      remove: (input) => transport.request(WS_METHODS.repoRemove, input),
+      setActive: (input) => transport.request(WS_METHODS.repoSetActive, input),
     },
     contextMenu: {
       show: async <T extends string>(
@@ -203,6 +221,15 @@ export function createWsNativeApi(): NativeApi {
           const payload = decodeAndWarnOnFailure(OrchestrationEvent, data);
           if (payload) callback(payload);
         }),
+    },
+    kanban: {
+      list: (input) => transport.request(KANBAN_WS_METHODS.list, input),
+      create: (input) => transport.request(KANBAN_WS_METHODS.create, input),
+      update: (input) => transport.request(KANBAN_WS_METHODS.update, input),
+      move: (input) => transport.request(KANBAN_WS_METHODS.move, input),
+      delete: (input) => transport.request(KANBAN_WS_METHODS.delete, input),
+      onUpdated: (callback) =>
+        transport.subscribe(KANBAN_WS_CHANNELS.updated, callback),
     },
   };
 

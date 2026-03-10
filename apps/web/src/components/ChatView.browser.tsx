@@ -206,6 +206,7 @@ function createSnapshotForTargetUser(options: {
         title: "Browser test thread",
         model: "gpt-5",
         interactionMode: "default",
+        conductorStatus: "backlog",
         runtimeMode: "full-access",
         branch: "main",
         worktreePath: null,

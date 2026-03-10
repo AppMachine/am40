@@ -18,6 +18,7 @@ import { OrchestrationProjectionPipelineLive } from "./orchestration/Layers/Proj
 import { OrchestrationProjectionSnapshotQueryLive } from "./orchestration/Layers/ProjectionSnapshotQuery";
 import { ProviderRuntimeIngestionLive } from "./orchestration/Layers/ProviderRuntimeIngestion";
 import { ProviderUnsupportedError } from "./provider/Errors";
+import { ClaudeCodeAdapterLive } from "./provider/Layers/ClaudeCodeAdapter";
 import { makeCodexAdapterLive } from "./provider/Layers/CodexAdapter";
 import { ProviderAdapterRegistryLive } from "./provider/Layers/ProviderAdapterRegistry";
 import { makeProviderServiceLive } from "./provider/Layers/ProviderService";
@@ -31,10 +32,13 @@ import { GitManagerLive } from "./git/Layers/GitManager";
 import { GitCoreLive } from "./git/Layers/GitCore";
 import { GitHubCliLive } from "./git/Layers/GitHubCli";
 import { CodexTextGenerationLive } from "./git/Layers/CodexTextGeneration";
+import { GitScriptOpsLive } from "./git/Layers/GitScriptOps";
 import { GitServiceLive } from "./git/Layers/GitService";
+import { SpotlightServiceLive } from "./spotlight/SpotlightService";
 import { BunPtyAdapterLive } from "./terminal/Layers/BunPTY";
 import { NodePtyAdapterLive } from "./terminal/Layers/NodePTY";
 import { AnalyticsService } from "./telemetry/Services/AnalyticsService";
+import { RegisteredRepoRepositoryLive } from "./persistence/Services/RegisteredRepoRepository";
 
 export function makeServerProviderLayer(): Layer.Layer<
   ProviderService,
@@ -57,8 +61,10 @@ export function makeServerProviderLayer(): Layer.Layer<
     const codexAdapterLayer = makeCodexAdapterLive(
       nativeEventLogger ? { nativeEventLogger } : undefined,
     );
+    const claudeCodeAdapterLayer = ClaudeCodeAdapterLive;
     const adapterRegistryLayer = ProviderAdapterRegistryLive.pipe(
       Layer.provide(codexAdapterLayer),
+      Layer.provide(claudeCodeAdapterLayer),
       Layer.provideMerge(providerSessionDirectoryLayer),
     );
     return makeProviderServiceLive(
@@ -119,11 +125,17 @@ export function makeServerRuntimeServicesLayer() {
     Layer.provideMerge(textGenerationLayer),
   );
 
+  const gitScriptOpsLayer = GitScriptOpsLive.pipe(Layer.provideMerge(gitCoreLayer));
+  const spotlightLayer = SpotlightServiceLive.pipe(Layer.provideMerge(gitCoreLayer));
+
   return Layer.mergeAll(
     orchestrationReactorLayer,
     gitCoreLayer,
     gitManagerLayer,
+    gitScriptOpsLayer,
+    spotlightLayer,
     terminalLayer,
     KeybindingsLive,
+    RegisteredRepoRepositoryLive,
   ).pipe(Layer.provideMerge(NodeServices.layer));
 }

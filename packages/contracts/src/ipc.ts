@@ -9,14 +9,27 @@ import type {
   GitInitInput,
   GitListBranchesInput,
   GitListBranchesResult,
+  GitMergeFromInput,
+  GitMergeIntoInput,
+  GitMergeResult,
+  GitOverwriteInput,
+  GitOverwriteResult,
   GitPullInput,
   GitPullResult,
   GitRemoveWorktreeInput,
+  GitResetInput,
+  GitResetResult,
   GitResolvePullRequestResult,
   GitRunStackedActionInput,
   GitRunStackedActionResult,
+  GitSaveInput,
+  GitSaveResult,
   GitStatusInput,
   GitStatusResult,
+  SpotlightDisableInput,
+  SpotlightEnableInput,
+  SpotlightStatusInput,
+  SpotlightStatusResult,
 } from "./git";
 import type {
   ProjectSearchEntriesInput,
@@ -43,8 +56,20 @@ import type {
   OrchestrationGetTurnDiffResult,
   OrchestrationEvent,
   OrchestrationReadModel,
+  KanbanTicket,
+  KanbanListInput,
+  KanbanCreateInput,
+  KanbanUpdateInput,
+  KanbanMoveInput,
+  KanbanDeleteInput,
 } from "./orchestration";
 import { EditorId } from "./editor";
+import type {
+  RegisteredRepo,
+  RepoAddInput,
+  RepoRemoveInput,
+  RepoSetActiveInput,
+} from "./repo";
 
 export interface ContextMenuItem<T extends string = string> {
   id: T;
@@ -146,6 +171,23 @@ export interface NativeApi {
     pull: (input: GitPullInput) => Promise<GitPullResult>;
     status: (input: GitStatusInput) => Promise<GitStatusResult>;
     runStackedAction: (input: GitRunStackedActionInput) => Promise<GitRunStackedActionResult>;
+    // Git script operations
+    save: (input: GitSaveInput) => Promise<GitSaveResult>;
+    mergeFrom: (input: GitMergeFromInput) => Promise<GitMergeResult>;
+    mergeInto: (input: GitMergeIntoInput) => Promise<GitMergeResult>;
+    overwrite: (input: GitOverwriteInput) => Promise<GitOverwriteResult>;
+    reset: (input: GitResetInput) => Promise<GitResetResult>;
+  };
+  spotlight: {
+    enable: (input: SpotlightEnableInput) => Promise<void>;
+    disable: (input: SpotlightDisableInput) => Promise<void>;
+    status: (input: SpotlightStatusInput) => Promise<SpotlightStatusResult>;
+  };
+  repo: {
+    list: () => Promise<RegisteredRepo[]>;
+    add: (input: RepoAddInput) => Promise<RegisteredRepo>;
+    remove: (input: RepoRemoveInput) => Promise<void>;
+    setActive: (input: RepoSetActiveInput) => Promise<void>;
   };
   contextMenu: {
     show: <T extends string>(
@@ -166,5 +208,13 @@ export interface NativeApi {
     ) => Promise<OrchestrationGetFullThreadDiffResult>;
     replayEvents: (fromSequenceExclusive: number) => Promise<OrchestrationEvent[]>;
     onDomainEvent: (callback: (event: OrchestrationEvent) => void) => () => void;
+  };
+  kanban: {
+    list: (input: KanbanListInput) => Promise<KanbanTicket[]>;
+    create: (input: KanbanCreateInput) => Promise<KanbanTicket>;
+    update: (input: KanbanUpdateInput) => Promise<KanbanTicket>;
+    move: (input: KanbanMoveInput) => Promise<KanbanTicket>;
+    delete: (input: KanbanDeleteInput) => Promise<void>;
+    onUpdated: (callback: (data: unknown) => void) => () => void;
   };
 }

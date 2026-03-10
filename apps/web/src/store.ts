@@ -18,10 +18,13 @@ import { Debouncer } from "@tanstack/react-pacer";
 
 // ── State ────────────────────────────────────────────────────────────
 
+export type SidebarViewMode = "by-repo" | "by-status";
+
 export interface AppState {
   projects: Project[];
   threads: Thread[];
   threadsHydrated: boolean;
+  sidebarViewMode: SidebarViewMode;
 }
 
 const PERSISTED_STATE_KEY = "t3code:renderer-state:v8";
@@ -37,10 +40,24 @@ const LEGACY_PERSISTED_STATE_KEYS = [
   "codething:renderer-state:v1",
 ] as const;
 
+const SIDEBAR_VIEW_MODE_KEY = "t3code:sidebar-view-mode";
+
+function readSidebarViewMode(): SidebarViewMode {
+  if (typeof window === "undefined") return "by-repo";
+  try {
+    const raw = window.localStorage.getItem(SIDEBAR_VIEW_MODE_KEY);
+    if (raw === "by-status") return "by-status";
+    return "by-repo";
+  } catch {
+    return "by-repo";
+  }
+}
+
 const initialState: AppState = {
   projects: [],
   threads: [],
   threadsHydrated: false,
+  sidebarViewMode: readSidebarViewMode(),
 };
 const persistedExpandedProjectCwds = new Set<string>();
 const persistedProjectOrderCwds: string[] = [];
@@ -117,6 +134,23 @@ function updateThread(
   return changed ? next : threads;
 }
 
+/**
+ * Derive a display name for a project.
+ * Uses the workspace root path to build a meaningful short name.
+ * Shows the last path segment, or "parent/name" if the basename alone is generic.
+ */
+function deriveProjectDisplayName(title: string, workspaceRoot: string): string {
+  const segments = workspaceRoot.split(/[/\\]/).filter(Boolean);
+  const basename = segments.at(-1);
+  if (!basename) return title;
+  // Generic basenames that are too ambiguous on their own — include parent for context
+  const GENERIC_NAMES = new Set(["server", "app", "web", "api", "client", "src", "packages", "apps"]);
+  if (GENERIC_NAMES.has(basename.toLowerCase()) && segments.length >= 2) {
+    return `${segments[segments.length - 2]}/${basename}`;
+  }
+  return basename;
+}
+
 function mapProjectsFromReadModel(
   incoming: OrchestrationReadModel["projects"],
   previous: Project[],
@@ -136,7 +170,7 @@ function mapProjectsFromReadModel(
     const existing = previousById.get(project.id) ?? previousByCwd.get(project.workspaceRoot);
     return {
       id: project.id,
-      name: project.title,
+      name: deriveProjectDisplayName(project.title, project.workspaceRoot),
       cwd: project.workspaceRoot,
       model:
         existing?.model ??
@@ -189,24 +223,31 @@ function toLegacySessionStatus(
 }
 
 function toLegacyProvider(providerName: string | null): ProviderKind {
-  if (providerName === "codex") {
+  if (providerName === "codex" || providerName === "claude-code") {
     return providerName;
   }
   return "codex";
 }
 
 const CODEX_MODEL_SLUGS = new Set<string>(getModelOptions("codex").map((option) => option.slug));
+const CLAUDE_CODE_MODEL_SLUGS = new Set<string>(
+  getModelOptions("claude-code").map((option) => option.slug),
+);
 
 function inferProviderForThreadModel(input: {
   readonly model: string;
   readonly sessionProviderName: string | null;
 }): ProviderKind {
-  if (input.sessionProviderName === "codex") {
+  if (input.sessionProviderName === "codex" || input.sessionProviderName === "claude-code") {
     return input.sessionProviderName;
   }
   const normalizedCodex = normalizeModelSlug(input.model, "codex");
   if (normalizedCodex && CODEX_MODEL_SLUGS.has(normalizedCodex)) {
     return "codex";
+  }
+  const normalizedClaude = normalizeModelSlug(input.model, "claude-code");
+  if (normalizedClaude && CLAUDE_CODE_MODEL_SLUGS.has(normalizedClaude)) {
+    return "claude-code";
   }
   return "codex";
 }
@@ -269,6 +310,7 @@ export function syncServerReadModel(state: AppState, readModel: OrchestrationRea
         ),
         runtimeMode: thread.runtimeMode,
         interactionMode: thread.interactionMode,
+        conductorStatus: thread.conductorStatus ?? "backlog",
         session: thread.session
           ? {
               provider: toLegacyProvider(thread.session.providerName),
@@ -441,6 +483,7 @@ interface AppStore extends AppState {
   reorderProjects: (draggedProjectId: Project["id"], targetProjectId: Project["id"]) => void;
   setError: (threadId: ThreadId, error: string | null) => void;
   setThreadBranch: (threadId: ThreadId, branch: string | null, worktreePath: string | null) => void;
+  setSidebarViewMode: (mode: SidebarViewMode) => void;
 }
 
 export const useStore = create<AppStore>((set) => ({
@@ -457,6 +500,12 @@ export const useStore = create<AppStore>((set) => ({
   setError: (threadId, error) => set((state) => setError(state, threadId, error)),
   setThreadBranch: (threadId, branch, worktreePath) =>
     set((state) => setThreadBranch(state, threadId, branch, worktreePath)),
+  setSidebarViewMode: (mode) => {
+    try {
+      window.localStorage.setItem(SIDEBAR_VIEW_MODE_KEY, mode);
+    } catch {}
+    set({ sidebarViewMode: mode });
+  },
 }));
 
 // Persist state changes with debouncing to avoid localStorage thrashing

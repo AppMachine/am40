@@ -7,6 +7,7 @@
  * @module ProjectionThreadRepository
  */
 import {
+  ConductorStatus,
   IsoDateTime,
   ProjectId,
   ProviderInteractionMode,
@@ -26,6 +27,7 @@ export const ProjectionThread = Schema.Struct({
   model: Schema.String,
   runtimeMode: RuntimeMode,
   interactionMode: ProviderInteractionMode,
+  conductorStatus: ConductorStatus.pipe(Schema.withDecodingDefault(() => "backlog" as const)),
   branch: Schema.NullOr(Schema.String),
   worktreePath: Schema.NullOr(Schema.String),
   latestTurnId: Schema.NullOr(TurnId),

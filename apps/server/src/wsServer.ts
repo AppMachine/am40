@@ -6,6 +6,7 @@
  *
  * @module Server
  */
+import { execFile } from "node:child_process";
 import http from "node:http";
 import type { Duplex } from "node:stream";
 
@@ -27,7 +28,10 @@ import {
   WsPush,
   WsResponse,
   ServerProviderStatus,
+  KANBAN_WS_METHODS,
+  KANBAN_WS_CHANNELS,
 } from "@t3tools/contracts";
+import * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import {
   Cause,
@@ -47,6 +51,8 @@ import { WebSocketServer, type WebSocket } from "ws";
 
 import { createLogger } from "./logger";
 import { GitManager } from "./git/Services/GitManager.ts";
+import { GitScriptOps } from "./git/Services/GitScriptOps.ts";
+import { SpotlightService } from "./spotlight/SpotlightService.ts";
 import { TerminalManager } from "./terminal/Services/Manager.ts";
 import { Keybindings } from "./keybindings";
 import { searchWorkspaceEntries } from "./workspaceEntries";
@@ -74,6 +80,7 @@ import {
 import { parseBase64DataUrl } from "./imageMime.ts";
 import { AnalyticsService } from "./telemetry/Services/AnalyticsService.ts";
 import { expandHomePath } from "./os-jank.ts";
+import { RegisteredRepoRepository } from "./persistence/Services/RegisteredRepoRepository.ts";
 
 /**
  * ServerShape - Service API for server lifecycle control.
@@ -85,7 +92,12 @@ export interface ServerShape {
   readonly start: Effect.Effect<
     http.Server,
     ServerLifecycleError,
-    Scope.Scope | ServerRuntimeServices | ServerConfig | FileSystem.FileSystem | Path.Path
+    | Scope.Scope
+    | ServerRuntimeServices
+    | ServerConfig
+    | FileSystem.FileSystem
+    | Path.Path
+    | SqlClient.SqlClient
   >;
 
   /**
@@ -214,6 +226,9 @@ export type ServerRuntimeServices =
   | ServerCoreRuntimeServices
   | GitManager
   | GitCore
+  | GitScriptOps
+  | SpotlightService
+  | RegisteredRepoRepository
   | TerminalManager
   | Keybindings
   | Open
@@ -234,7 +249,12 @@ class RouteRequestError extends Schema.TaggedErrorClass<RouteRequestError>()("Ro
 export const createServer = Effect.fn(function* (): Effect.fn.Return<
   http.Server,
   ServerLifecycleError,
-  Scope.Scope | ServerRuntimeServices | ServerConfig | FileSystem.FileSystem | Path.Path
+  | Scope.Scope
+  | ServerRuntimeServices
+  | ServerConfig
+  | FileSystem.FileSystem
+  | Path.Path
+  | SqlClient.SqlClient
 > {
   const serverConfig = yield* ServerConfig;
   const {
@@ -251,12 +271,16 @@ export const createServer = Effect.fn(function* (): Effect.fn.Return<
   const availableEditors = resolveAvailableEditors();
 
   const gitManager = yield* GitManager;
+  const gitScriptOps = yield* GitScriptOps;
+  const spotlight = yield* SpotlightService;
   const terminalManager = yield* TerminalManager;
   const keybindingsManager = yield* Keybindings;
   const providerHealth = yield* ProviderHealth;
   const git = yield* GitCore;
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
+  const sql = yield* SqlClient.SqlClient;
+  const repoRepository = yield* RegisteredRepoRepository;
 
   yield* keybindingsManager.syncDefaultKeybindingsOnStartup.pipe(
     Effect.catch((error) =>
@@ -650,14 +674,60 @@ export const createServer = Effect.fn(function* (): Effect.fn.Return<
 
   yield* Scope.provide(orchestrationReactor.start, subscriptionsScope);
 
+  // Deduplicate projects with same normalized workspaceRoot.
+  // Groups ALL projects (including soft-deleted) so we can recover
+  // orphaned threads from previously-deleted duplicate projects.
+  yield* Effect.gen(function* () {
+    const dedupSnapshot = yield* projectionReadModelQuery.getSnapshot();
+    const allProjects = dedupSnapshot.projects;
+    const projectsByRoot = new Map<string, typeof allProjects>();
+    for (const project of allProjects) {
+      const normalized = path.resolve(project.workspaceRoot);
+      const group = projectsByRoot.get(normalized) ?? [];
+      group.push(project);
+      projectsByRoot.set(normalized, group);
+    }
+    for (const [, projects] of projectsByRoot) {
+      if (projects.length <= 1) continue;
+      const sorted = projects.toSorted((a, b) => a.createdAt.localeCompare(b.createdAt));
+      const keeper = sorted.find((p) => p.deletedAt === null) ?? sorted[0];
+
+      for (const other of sorted) {
+        if (other.id === keeper.id) continue;
+        yield* sql`
+          UPDATE projection_threads
+          SET project_id = ${keeper.id}
+          WHERE project_id = ${other.id}
+        `;
+        if (other.deletedAt === null) {
+          yield* orchestrationEngine.dispatch({
+            type: "project.delete",
+            commandId: CommandId.makeUnsafe(crypto.randomUUID()),
+            projectId: other.id,
+            deletedAt: new Date().toISOString(),
+          });
+        }
+      }
+
+      if (keeper.deletedAt !== null) {
+        yield* sql`
+          UPDATE projection_projects
+          SET deleted_at = NULL, updated_at = ${new Date().toISOString()}
+          WHERE project_id = ${keeper.id}
+        `;
+      }
+    }
+  }).pipe(Effect.ignore);
+
   let welcomeBootstrapProjectId: ProjectId | undefined;
   let welcomeBootstrapThreadId: ThreadId | undefined;
 
   if (autoBootstrapProjectFromCwd) {
     yield* Effect.gen(function* () {
       const snapshot = yield* projectionReadModelQuery.getSnapshot();
+      const normalizedCwd = path.resolve(cwd);
       const existingProject = snapshot.projects.find(
-        (project) => project.workspaceRoot === cwd && project.deletedAt === null,
+        (project) => path.resolve(project.workspaceRoot) === normalizedCwd && project.deletedAt === null,
       );
       let bootstrapProjectId: ProjectId;
       let bootstrapProjectDefaultModel: string;
@@ -714,7 +784,7 @@ export const createServer = Effect.fn(function* (): Effect.fn.Return<
   }
 
   const runtimeServices = yield* Effect.services<
-    ServerRuntimeServices | ServerConfig | FileSystem.FileSystem | Path.Path
+    ServerRuntimeServices | ServerConfig | FileSystem.FileSystem | Path.Path | SqlClient.SqlClient
   >();
   const runPromise = Effect.runPromiseWith(runtimeServices);
 
@@ -870,6 +940,50 @@ export const createServer = Effect.fn(function* (): Effect.fn.Return<
         return yield* git.initRepo(body);
       }
 
+      case WS_METHODS.gitSave: {
+        const body = stripRequestTag(request.body);
+        return yield* gitScriptOps.save(body.cwd, body.message);
+      }
+
+      case WS_METHODS.gitMergeFrom: {
+        const body = stripRequestTag(request.body);
+        return yield* gitScriptOps.mergeFrom(body.cwd, body.sourceBranch);
+      }
+
+      case WS_METHODS.gitMergeInto: {
+        const body = stripRequestTag(request.body);
+        return yield* gitScriptOps.mergeInto(body.cwd, body.targetBranch);
+      }
+
+      case WS_METHODS.gitOverwrite: {
+        const body = stripRequestTag(request.body);
+        return yield* gitScriptOps.overwrite(body.cwd, body.targetBranch);
+      }
+
+      case WS_METHODS.gitReset: {
+        const body = stripRequestTag(request.body);
+        return yield* gitScriptOps.reset(body.cwd, body.targetBranch);
+      }
+
+      case WS_METHODS.spotlightEnable: {
+        const body = stripRequestTag(request.body);
+        return yield* spotlight.enable({
+          threadId: body.threadId,
+          sourceDir: cwd,
+          targetDir: cwd,
+        });
+      }
+
+      case WS_METHODS.spotlightDisable: {
+        const body = stripRequestTag(request.body);
+        return yield* spotlight.disable(body.threadId);
+      }
+
+      case WS_METHODS.spotlightStatus: {
+        const body = stripRequestTag(request.body);
+        return yield* spotlight.status(body.threadId);
+      }
+
       case WS_METHODS.terminalOpen: {
         const body = stripRequestTag(request.body);
         return yield* terminalManager.open(body);
@@ -900,6 +1014,62 @@ export const createServer = Effect.fn(function* (): Effect.fn.Return<
         return yield* terminalManager.close(body);
       }
 
+      case WS_METHODS.repoList: {
+        return yield* repoRepository.list;
+      }
+
+      case WS_METHODS.repoAdd: {
+        const body = stripRequestTag(request.body);
+        const repoPath = path.resolve(yield* expandHomePath(body.path.trim()));
+
+        // Validate path is a git repo
+        yield* Effect.tryPromise({
+          try: () =>
+            new Promise<void>((resolve, reject) => {
+              execFile(
+                "git",
+                ["rev-parse", "--is-inside-work-tree"],
+                { cwd: repoPath },
+                (error) => {
+                  if (error) reject(new Error(`Not a git repository: ${repoPath}`));
+                  else resolve();
+                },
+              );
+            }),
+          catch: (cause) =>
+            new RouteRequestError({
+              message: cause instanceof Error ? cause.message : `Not a git repository: ${repoPath}`,
+            }),
+        });
+
+        const repoName = body.name ?? (path.basename(repoPath) || "repo");
+        const repo = {
+          id: crypto.randomUUID(),
+          name: repoName,
+          path: repoPath,
+          defaultBranch: "main",
+          addedAt: new Date().toISOString(),
+        };
+        return yield* repoRepository.add(repo);
+      }
+
+      case WS_METHODS.repoRemove: {
+        const body = stripRequestTag(request.body);
+        return yield* repoRepository.remove(body.id);
+      }
+
+      case WS_METHODS.repoSetActive: {
+        const body = stripRequestTag(request.body);
+        const repo = yield* repoRepository.getById(body.id);
+        if (!repo) {
+          return yield* new RouteRequestError({
+            message: `Repo not found: ${body.id}`,
+          });
+        }
+        // Active repo is a client-side concern; acknowledge the request
+        return { id: repo.id, path: repo.path };
+      }
+
       case WS_METHODS.serverGetConfig:
         const keybindingsConfig = yield* keybindingsManager.loadConfigState;
         return {
@@ -915,6 +1085,123 @@ export const createServer = Effect.fn(function* (): Effect.fn.Return<
         const body = stripRequestTag(request.body);
         const keybindingsConfig = yield* keybindingsManager.upsertKeybindingRule(body);
         return { keybindings: keybindingsConfig, issues: [] };
+      }
+
+
+      // ── Kanban ──────────────────────────────────────────────────────
+      case KANBAN_WS_METHODS.list: {
+        const { projectId } = stripRequestTag(request.body);
+        return yield* sql`
+          SELECT id, projectId, title, description, status, position, threadId, createdAt, updatedAt
+          FROM projection_kanban_tickets
+          WHERE projectId = ${projectId}
+          ORDER BY position ASC
+        `;
+      }
+
+      case KANBAN_WS_METHODS.create: {
+        const { projectId, title, status } = stripRequestTag(request.body);
+        const id = crypto.randomUUID();
+        const now = new Date().toISOString();
+        const maxPosRows = yield* sql`
+          SELECT COALESCE(MAX(position), 0) AS maxPos
+          FROM projection_kanban_tickets
+          WHERE projectId = ${projectId} AND status = ${status}
+        `;
+        const position =
+          ((maxPosRows as ReadonlyArray<{ maxPos: number }>)[0]?.maxPos ?? 0) + 1;
+        const ticket = {
+          id,
+          projectId,
+          title,
+          description: "",
+          status,
+          position,
+          threadId: null,
+          createdAt: now,
+          updatedAt: now,
+        };
+        yield* sql`
+          INSERT INTO projection_kanban_tickets (id, projectId, title, description, status, position, threadId, createdAt, updatedAt)
+          VALUES (${ticket.id}, ${ticket.projectId}, ${ticket.title}, ${ticket.description}, ${ticket.status}, ${ticket.position}, ${ticket.threadId}, ${ticket.createdAt}, ${ticket.updatedAt})
+        `;
+        yield* broadcastPush({
+          type: "push",
+          channel: KANBAN_WS_CHANNELS.updated,
+          data: { projectId },
+        });
+        return ticket;
+      }
+
+      case KANBAN_WS_METHODS.update: {
+        const { id, ...fields } = stripRequestTag(request.body);
+        const now = new Date().toISOString();
+        if (fields.title !== undefined) {
+          yield* sql`UPDATE projection_kanban_tickets SET title = ${fields.title}, updatedAt = ${now} WHERE id = ${id}`;
+        }
+        if (fields.description !== undefined) {
+          yield* sql`UPDATE projection_kanban_tickets SET description = ${fields.description}, updatedAt = ${now} WHERE id = ${id}`;
+        }
+        if (fields.threadId !== undefined) {
+          yield* sql`UPDATE projection_kanban_tickets SET threadId = ${fields.threadId}, updatedAt = ${now} WHERE id = ${id}`;
+        }
+        const updatedRows = yield* sql`
+          SELECT id, projectId, title, description, status, position, threadId, createdAt, updatedAt
+          FROM projection_kanban_tickets
+          WHERE id = ${id}
+        `;
+        const updated = (updatedRows as ReadonlyArray<Record<string, unknown>>)[0];
+        if (!updated) {
+          return yield* new RouteRequestError({ message: `Kanban ticket not found: ${id}` });
+        }
+        yield* broadcastPush({
+          type: "push",
+          channel: KANBAN_WS_CHANNELS.updated,
+          data: { projectId: updated.projectId },
+        });
+        return updated;
+      }
+
+      case KANBAN_WS_METHODS.move: {
+        const { id, status, position } = stripRequestTag(request.body);
+        const now = new Date().toISOString();
+        yield* sql`
+          UPDATE projection_kanban_tickets
+          SET status = ${status}, position = ${position}, updatedAt = ${now}
+          WHERE id = ${id}
+        `;
+        const movedRows = yield* sql`
+          SELECT id, projectId, title, description, status, position, threadId, createdAt, updatedAt
+          FROM projection_kanban_tickets
+          WHERE id = ${id}
+        `;
+        const moved = (movedRows as ReadonlyArray<Record<string, unknown>>)[0];
+        if (!moved) {
+          return yield* new RouteRequestError({ message: `Kanban ticket not found: ${id}` });
+        }
+        yield* broadcastPush({
+          type: "push",
+          channel: KANBAN_WS_CHANNELS.updated,
+          data: { projectId: moved.projectId },
+        });
+        return moved;
+      }
+
+      case KANBAN_WS_METHODS.delete: {
+        const { id } = stripRequestTag(request.body);
+        const ticketRows = yield* sql`
+          SELECT projectId FROM projection_kanban_tickets WHERE id = ${id}
+        `;
+        const ticketRow = (ticketRows as ReadonlyArray<{ projectId: string }>)[0];
+        yield* sql`DELETE FROM projection_kanban_tickets WHERE id = ${id}`;
+        if (ticketRow) {
+          yield* broadcastPush({
+            type: "push",
+            channel: KANBAN_WS_CHANNELS.updated,
+            data: { projectId: ticketRow.projectId },
+          });
+        }
+        return {};
       }
 
       default: {

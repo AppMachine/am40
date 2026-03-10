@@ -317,5 +317,59 @@ export function resolveDefaultBranchActionDialogCopy(input: {
   };
 }
 
+// ── Git Script Operation Types ────────────────────────────────────────
+
+export type GitScriptActionId = "save" | "mergeFrom" | "mergeInto" | "overwrite" | "reset";
+
+export interface GitScriptMenuItem {
+  id: GitScriptActionId;
+  label: string;
+  disabled: boolean;
+  destructive: boolean;
+}
+
+export function buildGitScriptMenuItems(
+  gitStatus: GitStatusResult | null,
+  isBusy: boolean,
+): GitScriptMenuItem[] {
+  if (!gitStatus) return [];
+
+  const hasBranch = gitStatus.branch !== null;
+  const hasChanges = gitStatus.hasWorkingTreeChanges;
+
+  return [
+    {
+      id: "save",
+      label: "Save (add, commit, push)",
+      disabled: isBusy || !hasChanges,
+      destructive: false,
+    },
+    {
+      id: "mergeFrom",
+      label: "Merge from branch...",
+      disabled: isBusy || !hasBranch,
+      destructive: false,
+    },
+    {
+      id: "mergeInto",
+      label: "Merge into branch...",
+      disabled: isBusy || !hasBranch,
+      destructive: false,
+    },
+    {
+      id: "overwrite",
+      label: "Overwrite branch...",
+      disabled: isBusy || !hasBranch,
+      destructive: true,
+    },
+    {
+      id: "reset",
+      label: "Reset to branch...",
+      disabled: isBusy || !hasBranch,
+      destructive: true,
+    },
+  ];
+}
+
 // Re-export from shared for backwards compatibility in this module's exports
 export { resolveAutoFeatureBranchName } from "@t3tools/shared/git";

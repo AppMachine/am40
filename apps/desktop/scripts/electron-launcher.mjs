@@ -3,7 +3,6 @@
 import { spawnSync } from "node:child_process";
 import {
   copyFileSync,
-  cpSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -17,7 +16,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
-const APP_DISPLAY_NAME = isDevelopment ? "T3 Code (Dev)" : "T3 Code (Alpha)";
+const APP_DISPLAY_NAME = isDevelopment ? "AM40 Conductor (Dev)" : "AM40 Conductor (Alpha)";
 const APP_BUNDLE_ID = "com.t3tools.t3code";
 const LAUNCHER_VERSION = 1;
 
@@ -124,7 +123,15 @@ function buildMacLauncher(electronBinaryPath) {
   }
 
   rmSync(targetAppBundlePath, { recursive: true, force: true });
-  cpSync(sourceAppBundlePath, targetAppBundlePath, { recursive: true });
+  // Use `cp -RPp` instead of `cpSync` to preserve relative symlinks inside the
+  // Electron Framework.framework bundle.  Node's `cpSync` resolves symlinks to
+  // absolute paths which breaks helper process resource lookup (icudtl.dat).
+  const cpResult = spawnSync("cp", ["-RPp", sourceAppBundlePath, targetAppBundlePath], {
+    stdio: "inherit",
+  });
+  if (cpResult.status !== 0) {
+    throw new Error(`Failed to copy Electron app bundle: cp exited with code ${cpResult.status}`);
+  }
   patchMainBundleInfoPlist(targetAppBundlePath, iconPath);
   patchHelperBundleInfoPlists(targetAppBundlePath);
   writeFileSync(metadataPath, `${JSON.stringify(expectedMetadata, null, 2)}\n`);

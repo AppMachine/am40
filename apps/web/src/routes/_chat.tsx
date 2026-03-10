@@ -30,6 +30,10 @@ function ChatRouteLayout() {
         side="left"
         collapsible="offcanvas"
         className="border-r border-border bg-card text-foreground"
+        resizable={{
+          minWidth: 14 * 16,
+          storageKey: "chat_left_sidebar_width",
+        }}
       >
         <ThreadSidebar />
       </Sidebar>

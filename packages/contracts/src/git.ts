@@ -203,3 +203,88 @@ export const GitPullResult = Schema.Struct({
   upstreamBranch: TrimmedNonEmptyStringSchema.pipe(Schema.NullOr),
 });
 export type GitPullResult = typeof GitPullResult.Type;
+
+// ── Git Script Operation Inputs ───────────────────────────────────────
+
+export const GitSaveInput = Schema.Struct({
+  cwd: TrimmedNonEmptyStringSchema,
+  message: Schema.optional(TrimmedNonEmptyStringSchema.check(Schema.isMaxLength(10_000))),
+});
+export type GitSaveInput = typeof GitSaveInput.Type;
+
+export const GitMergeFromInput = Schema.Struct({
+  cwd: TrimmedNonEmptyStringSchema,
+  sourceBranch: TrimmedNonEmptyStringSchema,
+});
+export type GitMergeFromInput = typeof GitMergeFromInput.Type;
+
+export const GitMergeIntoInput = Schema.Struct({
+  cwd: TrimmedNonEmptyStringSchema,
+  targetBranch: TrimmedNonEmptyStringSchema,
+});
+export type GitMergeIntoInput = typeof GitMergeIntoInput.Type;
+
+export const GitOverwriteInput = Schema.Struct({
+  cwd: TrimmedNonEmptyStringSchema,
+  targetBranch: TrimmedNonEmptyStringSchema,
+});
+export type GitOverwriteInput = typeof GitOverwriteInput.Type;
+
+export const GitResetInput = Schema.Struct({
+  cwd: TrimmedNonEmptyStringSchema,
+  targetBranch: TrimmedNonEmptyStringSchema,
+});
+export type GitResetInput = typeof GitResetInput.Type;
+
+// ── Git Script Operation Results ──────────────────────────────────────
+
+export const GitSaveResult = Schema.Struct({
+  status: Schema.Literals(["saved", "skipped_no_changes"]),
+  commitSha: Schema.optional(TrimmedNonEmptyStringSchema),
+  backupTag: Schema.optional(TrimmedNonEmptyStringSchema),
+  pushed: Schema.optional(Schema.Boolean),
+});
+export type GitSaveResult = typeof GitSaveResult.Type;
+
+export const GitMergeResult = Schema.Struct({
+  status: Schema.Literals(["merged", "conflict", "already_up_to_date"]),
+  conflictFiles: Schema.optional(Schema.Array(TrimmedNonEmptyStringSchema)),
+  commitSha: Schema.optional(TrimmedNonEmptyStringSchema),
+});
+export type GitMergeResult = typeof GitMergeResult.Type;
+
+export const GitOverwriteResult = Schema.Struct({
+  status: Schema.Literals(["overwritten"]),
+  backupTag: TrimmedNonEmptyStringSchema,
+});
+export type GitOverwriteResult = typeof GitOverwriteResult.Type;
+
+export const GitResetResult = Schema.Struct({
+  status: Schema.Literals(["reset"]),
+  backupTag: TrimmedNonEmptyStringSchema,
+  previousSha: TrimmedNonEmptyStringSchema,
+});
+export type GitResetResult = typeof GitResetResult.Type;
+
+// ── Spotlight Types ───────────────────────────────────────────────────
+
+export const SpotlightEnableInput = Schema.Struct({
+  threadId: TrimmedNonEmptyStringSchema,
+});
+export type SpotlightEnableInput = typeof SpotlightEnableInput.Type;
+
+export const SpotlightDisableInput = Schema.Struct({
+  threadId: TrimmedNonEmptyStringSchema,
+});
+export type SpotlightDisableInput = typeof SpotlightDisableInput.Type;
+
+export const SpotlightStatusInput = Schema.Struct({
+  threadId: TrimmedNonEmptyStringSchema,
+});
+export type SpotlightStatusInput = typeof SpotlightStatusInput.Type;
+
+export const SpotlightStatusResult = Schema.Struct({
+  active: Schema.Boolean,
+  lastSyncAt: Schema.NullOr(Schema.String),
+});
+export type SpotlightStatusResult = typeof SpotlightStatusResult.Type;

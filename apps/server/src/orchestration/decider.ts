@@ -159,6 +159,7 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           model: command.model,
           runtimeMode: command.runtimeMode,
           interactionMode: command.interactionMode,
+          conductorStatus: command.conductorStatus,
           branch: command.branch,
           worktreePath: command.worktreePath,
           createdAt: command.createdAt,
@@ -208,6 +209,9 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           threadId: command.threadId,
           ...(command.title !== undefined ? { title: command.title } : {}),
           ...(command.model !== undefined ? { model: command.model } : {}),
+          ...(command.conductorStatus !== undefined
+            ? { conductorStatus: command.conductorStatus }
+            : {}),
           ...(command.branch !== undefined ? { branch: command.branch } : {}),
           ...(command.worktreePath !== undefined ? { worktreePath: command.worktreePath } : {}),
           updatedAt: occurredAt,

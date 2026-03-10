@@ -1,14 +1,25 @@
 import type { GitStackedAction, GitStatusResult, ThreadId } from "@t3tools/contracts";
 import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDownIcon, CloudUploadIcon, GitCommitIcon, InfoIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  CloudUploadIcon,
+  GitCommitIcon,
+  GitMergeIcon,
+  InfoIcon,
+  RotateCcwIcon,
+  SaveIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import { GitHubIcon } from "./Icons";
 import {
   buildGitActionProgressStages,
+  buildGitScriptMenuItems,
   buildMenuItems,
   type GitActionIconName,
   type GitActionMenuItem,
   type GitQuickAction,
+  type GitScriptActionId,
   type DefaultBranchConfirmableAction,
   requiresDefaultBranchConfirmation,
   resolveDefaultBranchActionDialogCopy,
@@ -34,9 +45,14 @@ import { toastManager } from "~/components/ui/toast";
 import {
   gitBranchesQueryOptions,
   gitInitMutationOptions,
+  gitMergeFromMutationOptions,
+  gitMergeIntoMutationOptions,
   gitMutationKeys,
+  gitOverwriteMutationOptions,
   gitPullMutationOptions,
+  gitResetMutationOptions,
   gitRunStackedActionMutationOptions,
+  gitSaveMutationOptions,
   gitStatusQueryOptions,
   invalidateGitQueries,
 } from "~/lib/gitReactQuery";
@@ -171,11 +187,31 @@ export default function GitActionsControl({ gitCwd, activeThreadId }: GitActions
     gitRunStackedActionMutationOptions({ cwd: gitCwd, queryClient }),
   );
   const pullMutation = useMutation(gitPullMutationOptions({ cwd: gitCwd, queryClient }));
+  const saveMutation = useMutation(gitSaveMutationOptions({ cwd: gitCwd, queryClient }));
+  const mergeFromMutation = useMutation(gitMergeFromMutationOptions({ cwd: gitCwd, queryClient }));
+  const mergeIntoMutation = useMutation(gitMergeIntoMutationOptions({ cwd: gitCwd, queryClient }));
+  const overwriteMutation = useMutation(gitOverwriteMutationOptions({ cwd: gitCwd, queryClient }));
+  const resetMutation = useMutation(gitResetMutationOptions({ cwd: gitCwd, queryClient }));
+
+  const [pendingDestructiveAction, setPendingDestructiveAction] = useState<{
+    action: "overwrite" | "reset";
+    targetBranch: string;
+  } | null>(null);
+  const [branchInputDialogAction, setBranchInputDialogAction] = useState<GitScriptActionId | null>(
+    null,
+  );
+  const [branchInputValue, setBranchInputValue] = useState("");
 
   const isRunStackedActionRunning =
     useIsMutating({ mutationKey: gitMutationKeys.runStackedAction(gitCwd) }) > 0;
   const isPullRunning = useIsMutating({ mutationKey: gitMutationKeys.pull(gitCwd) }) > 0;
-  const isGitActionRunning = isRunStackedActionRunning || isPullRunning;
+  const isGitScriptRunning =
+    saveMutation.isPending ||
+    mergeFromMutation.isPending ||
+    mergeIntoMutation.isPending ||
+    overwriteMutation.isPending ||
+    resetMutation.isPending;
+  const isGitActionRunning = isRunStackedActionRunning || isPullRunning || isGitScriptRunning;
   const isDefaultBranch = useMemo(() => {
     const branchName = gitStatusForActions?.branch;
     if (!branchName) return false;
@@ -185,6 +221,10 @@ export default function GitActionsControl({ gitCwd, activeThreadId }: GitActions
 
   const gitActionMenuItems = useMemo(
     () => buildMenuItems(gitStatusForActions, isGitActionRunning),
+    [gitStatusForActions, isGitActionRunning],
+  );
+  const gitScriptMenuItems = useMemo(
+    () => buildGitScriptMenuItems(gitStatusForActions, isGitActionRunning),
     [gitStatusForActions, isGitActionRunning],
   );
   const quickAction = useMemo(
@@ -581,6 +621,138 @@ export default function GitActionsControl({ gitCwd, activeThreadId }: GitActions
     [gitCwd, threadToastData],
   );
 
+  const openGitScriptAction = useCallback(
+    (actionId: GitScriptActionId) => {
+      if (actionId === "save") {
+        const promise = saveMutation.mutateAsync({});
+        toastManager.promise(promise, {
+          loading: { title: "Saving...", data: threadToastData },
+          success: (result) => ({
+            title:
+              result.status === "saved"
+                ? `Saved${result.commitSha ? ` ${result.commitSha.slice(0, 7)}` : ""}${result.pushed ? " & pushed" : ""}`
+                : "No changes to save",
+            ...(result.backupTag
+              ? { description: `Backup: ${result.backupTag}` }
+              : {}),
+            data: threadToastData,
+          }),
+          error: (err) => ({
+            title: "Save failed",
+            description: err instanceof Error ? err.message : "An error occurred.",
+            data: threadToastData,
+          }),
+        });
+        void promise.catch(() => undefined);
+        return;
+      }
+      // Actions that need branch input
+      setBranchInputDialogAction(actionId);
+      setBranchInputValue("");
+    },
+    [saveMutation, threadToastData],
+  );
+
+  const runBranchInputAction = useCallback(() => {
+    if (!branchInputDialogAction || !branchInputValue.trim()) return;
+    const branch = branchInputValue.trim();
+    setBranchInputDialogAction(null);
+    setBranchInputValue("");
+
+    if (branchInputDialogAction === "overwrite" || branchInputDialogAction === "reset") {
+      setPendingDestructiveAction({ action: branchInputDialogAction, targetBranch: branch });
+      return;
+    }
+
+    if (branchInputDialogAction === "mergeFrom") {
+      const promise = mergeFromMutation.mutateAsync(branch);
+      toastManager.promise(promise, {
+        loading: { title: `Merging from ${branch}...`, data: threadToastData },
+        success: (result) => ({
+          title:
+            result.status === "merged"
+              ? `Merged from ${branch}`
+              : result.status === "already_up_to_date"
+                ? "Already up to date"
+                : `Merge conflict (${result.conflictFiles?.length ?? 0} files)`,
+          data: threadToastData,
+        }),
+        error: (err) => ({
+          title: "Merge failed",
+          description: err instanceof Error ? err.message : "An error occurred.",
+          data: threadToastData,
+        }),
+      });
+      void promise.catch(() => undefined);
+    } else if (branchInputDialogAction === "mergeInto") {
+      const promise = mergeIntoMutation.mutateAsync(branch);
+      toastManager.promise(promise, {
+        loading: { title: `Merging into ${branch}...`, data: threadToastData },
+        success: (result) => ({
+          title:
+            result.status === "merged"
+              ? `Merged into ${branch}`
+              : result.status === "already_up_to_date"
+                ? "Already up to date"
+                : "Fast-forward merge not possible",
+          data: threadToastData,
+        }),
+        error: (err) => ({
+          title: "Merge failed",
+          description: err instanceof Error ? err.message : "An error occurred.",
+          data: threadToastData,
+        }),
+      });
+      void promise.catch(() => undefined);
+    }
+  }, [
+    branchInputDialogAction,
+    branchInputValue,
+    mergeFromMutation,
+    mergeIntoMutation,
+    threadToastData,
+  ]);
+
+  const confirmDestructiveAction = useCallback(() => {
+    if (!pendingDestructiveAction) return;
+    const { action, targetBranch } = pendingDestructiveAction;
+    setPendingDestructiveAction(null);
+
+    if (action === "overwrite") {
+      const promise = overwriteMutation.mutateAsync(targetBranch);
+      toastManager.promise(promise, {
+        loading: { title: `Overwriting ${targetBranch}...`, data: threadToastData },
+        success: (result) => ({
+          title: `Overwritten ${targetBranch}`,
+          description: `Backup tag: ${result.backupTag}`,
+          data: threadToastData,
+        }),
+        error: (err) => ({
+          title: "Overwrite failed",
+          description: err instanceof Error ? err.message : "An error occurred.",
+          data: threadToastData,
+        }),
+      });
+      void promise.catch(() => undefined);
+    } else {
+      const promise = resetMutation.mutateAsync(targetBranch);
+      toastManager.promise(promise, {
+        loading: { title: `Resetting to ${targetBranch}...`, data: threadToastData },
+        success: (result) => ({
+          title: `Reset to ${targetBranch}`,
+          description: `Backup tag: ${result.backupTag}`,
+          data: threadToastData,
+        }),
+        error: (err) => ({
+          title: "Reset failed",
+          description: err instanceof Error ? err.message : "An error occurred.",
+          data: threadToastData,
+        }),
+      });
+      void promise.catch(() => undefined);
+    }
+  }, [pendingDestructiveAction, overwriteMutation, resetMutation, threadToastData]);
+
   if (!gitCwd) return null;
 
   return (
@@ -683,6 +855,32 @@ export default function GitActionsControl({ gitCwd, activeThreadId }: GitActions
                   </MenuItem>
                 );
               })}
+              {gitScriptMenuItems.length > 0 && (
+                <>
+                  <div className="my-1 border-t border-input" />
+                  {gitScriptMenuItems.map((item) => (
+                    <MenuItem
+                      key={item.id}
+                      disabled={item.disabled}
+                      onClick={() => openGitScriptAction(item.id)}
+                    >
+                      {item.id === "save" && <SaveIcon className="size-3.5" />}
+                      {(item.id === "mergeFrom" || item.id === "mergeInto") && (
+                        <GitMergeIcon className="size-3.5" />
+                      )}
+                      {item.id === "overwrite" && (
+                        <TriangleAlertIcon className="size-3.5 text-warning" />
+                      )}
+                      {item.id === "reset" && (
+                        <RotateCcwIcon className="size-3.5 text-warning" />
+                      )}
+                      <span className={item.destructive ? "text-warning" : ""}>
+                        {item.label}
+                      </span>
+                    </MenuItem>
+                  ))}
+                </>
+              )}
               {gitStatusForActions?.branch === null && (
                 <p className="px-2 py-1.5 text-xs text-warning">
                   Detached HEAD: create and checkout a branch to enable push and PR actions.
@@ -830,6 +1028,114 @@ export default function GitActionsControl({ gitCwd, activeThreadId }: GitActions
             </Button>
             <Button size="sm" onClick={checkoutFeatureBranchAndContinuePendingAction}>
               Checkout feature branch & continue
+            </Button>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
+
+      <Dialog
+        open={branchInputDialogAction !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setBranchInputDialogAction(null);
+            setBranchInputValue("");
+          }
+        }}
+      >
+        <DialogPopup>
+          <DialogHeader>
+            <DialogTitle>
+              {branchInputDialogAction === "mergeFrom"
+                ? "Merge from branch"
+                : branchInputDialogAction === "mergeInto"
+                  ? "Merge into branch"
+                  : branchInputDialogAction === "overwrite"
+                    ? "Overwrite branch"
+                    : "Reset to branch"}
+            </DialogTitle>
+            <DialogDescription>
+              {branchInputDialogAction === "mergeFrom"
+                ? "Merge the specified branch into your current branch."
+                : branchInputDialogAction === "mergeInto"
+                  ? "Fast-forward merge your current branch into the target branch."
+                  : branchInputDialogAction === "overwrite"
+                    ? "Force push your current branch to the target. A backup tag will be created."
+                    : "Hard reset your current branch to match the target. A backup tag will be created."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogPanel className="space-y-3">
+            <div className="space-y-1">
+              <p className="text-xs font-medium">Branch name</p>
+              <Textarea
+                value={branchInputValue}
+                onChange={(event) => setBranchInputValue(event.target.value)}
+                placeholder="e.g. main, origin/main, feature/xyz"
+                size="sm"
+              />
+            </div>
+          </DialogPanel>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setBranchInputDialogAction(null);
+                setBranchInputValue("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={!branchInputValue.trim()}
+              onClick={runBranchInputAction}
+              variant={
+                branchInputDialogAction === "overwrite" || branchInputDialogAction === "reset"
+                  ? "destructive"
+                  : "default"
+              }
+            >
+              {branchInputDialogAction === "mergeFrom"
+                ? "Merge"
+                : branchInputDialogAction === "mergeInto"
+                  ? "Merge into"
+                  : branchInputDialogAction === "overwrite"
+                    ? "Overwrite"
+                    : "Reset"}
+            </Button>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
+
+      <Dialog
+        open={pendingDestructiveAction !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDestructiveAction(null);
+        }}
+      >
+        <DialogPopup className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {pendingDestructiveAction?.action === "overwrite"
+                ? `Overwrite "${pendingDestructiveAction.targetBranch}"?`
+                : `Reset to "${pendingDestructiveAction?.targetBranch}"?`}
+            </DialogTitle>
+            <DialogDescription>
+              {pendingDestructiveAction?.action === "overwrite"
+                ? `This will force push your current branch to "${pendingDestructiveAction.targetBranch}", replacing its history. A backup tag will be created before the operation.`
+                : `This will hard reset your current branch to match "${pendingDestructiveAction?.targetBranch}". All uncommitted changes will be lost. A backup tag will be created before the operation.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPendingDestructiveAction(null)}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" size="sm" onClick={confirmDestructiveAction}>
+              {pendingDestructiveAction?.action === "overwrite" ? "Overwrite" : "Reset"}
             </Button>
           </DialogFooter>
         </DialogPopup>

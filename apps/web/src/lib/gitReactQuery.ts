@@ -20,6 +20,11 @@ export const gitMutationKeys = {
   pull: (cwd: string | null) => ["git", "mutation", "pull", cwd] as const,
   preparePullRequestThread: (cwd: string | null) =>
     ["git", "mutation", "prepare-pull-request-thread", cwd] as const,
+  save: (cwd: string | null) => ["git", "mutation", "save", cwd] as const,
+  mergeFrom: (cwd: string | null) => ["git", "mutation", "merge-from", cwd] as const,
+  mergeInto: (cwd: string | null) => ["git", "mutation", "merge-into", cwd] as const,
+  overwrite: (cwd: string | null) => ["git", "mutation", "overwrite", cwd] as const,
+  reset: (cwd: string | null) => ["git", "mutation", "reset", cwd] as const,
 };
 
 export function invalidateGitQueries(queryClient: QueryClient) {
@@ -206,6 +211,85 @@ export function gitPreparePullRequestThreadMutationOptions(input: {
       });
     },
     mutationKey: gitMutationKeys.preparePullRequestThread(input.cwd),
+    onSettled: async () => {
+      await invalidateGitQueries(input.queryClient);
+    },
+  });
+}
+
+export function gitSaveMutationOptions(input: { cwd: string | null; queryClient: QueryClient }) {
+  return mutationOptions({
+    mutationKey: gitMutationKeys.save(input.cwd),
+    mutationFn: async (params?: { message?: string }) => {
+      const api = ensureNativeApi();
+      if (!input.cwd) throw new Error("Git save is unavailable.");
+      return api.git.save({ cwd: input.cwd, ...(params?.message ? { message: params.message } : {}) });
+    },
+    onSettled: async () => {
+      await invalidateGitQueries(input.queryClient);
+    },
+  });
+}
+
+export function gitMergeFromMutationOptions(input: {
+  cwd: string | null;
+  queryClient: QueryClient;
+}) {
+  return mutationOptions({
+    mutationKey: gitMutationKeys.mergeFrom(input.cwd),
+    mutationFn: async (sourceBranch: string) => {
+      const api = ensureNativeApi();
+      if (!input.cwd) throw new Error("Git merge is unavailable.");
+      return api.git.mergeFrom({ cwd: input.cwd, sourceBranch });
+    },
+    onSettled: async () => {
+      await invalidateGitQueries(input.queryClient);
+    },
+  });
+}
+
+export function gitMergeIntoMutationOptions(input: {
+  cwd: string | null;
+  queryClient: QueryClient;
+}) {
+  return mutationOptions({
+    mutationKey: gitMutationKeys.mergeInto(input.cwd),
+    mutationFn: async (targetBranch: string) => {
+      const api = ensureNativeApi();
+      if (!input.cwd) throw new Error("Git merge is unavailable.");
+      return api.git.mergeInto({ cwd: input.cwd, targetBranch });
+    },
+    onSettled: async () => {
+      await invalidateGitQueries(input.queryClient);
+    },
+  });
+}
+
+export function gitOverwriteMutationOptions(input: {
+  cwd: string | null;
+  queryClient: QueryClient;
+}) {
+  return mutationOptions({
+    mutationKey: gitMutationKeys.overwrite(input.cwd),
+    mutationFn: async (targetBranch: string) => {
+      const api = ensureNativeApi();
+      if (!input.cwd) throw new Error("Git overwrite is unavailable.");
+      return api.git.overwrite({ cwd: input.cwd, targetBranch });
+    },
+    onSettled: async () => {
+      await invalidateGitQueries(input.queryClient);
+    },
+  });
+}
+
+export function gitResetMutationOptions(input: { cwd: string | null; queryClient: QueryClient }) {
+  return mutationOptions({
+    mutationKey: gitMutationKeys.reset(input.cwd),
+    mutationFn: async (targetBranch: string) => {
+      const api = ensureNativeApi();
+      if (!input.cwd) throw new Error("Git reset is unavailable.");
+      return api.git.reset({ cwd: input.cwd, targetBranch });
+    },
     onSettled: async () => {
       await invalidateGitQueries(input.queryClient);
     },

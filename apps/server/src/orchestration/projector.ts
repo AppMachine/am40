@@ -255,6 +255,7 @@ export function projectEvent(
             model: payload.model,
             runtimeMode: payload.runtimeMode,
             interactionMode: payload.interactionMode,
+            conductorStatus: payload.conductorStatus,
             branch: payload.branch,
             worktreePath: payload.worktreePath,
             latestTurn: null,
@@ -296,6 +297,9 @@ export function projectEvent(
           threads: updateThread(nextBase.threads, payload.threadId, {
             ...(payload.title !== undefined ? { title: payload.title } : {}),
             ...(payload.model !== undefined ? { model: payload.model } : {}),
+            ...(payload.conductorStatus !== undefined
+              ? { conductorStatus: payload.conductorStatus }
+              : {}),
             ...(payload.branch !== undefined ? { branch: payload.branch } : {}),
             ...(payload.worktreePath !== undefined ? { worktreePath: payload.worktreePath } : {}),
             updatedAt: payload.updatedAt,

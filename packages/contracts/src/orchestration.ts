@@ -15,6 +15,77 @@ import {
   TurnId,
 } from "./baseSchemas";
 
+// ── Kanban ────────────────────────────────────────────────────────────
+
+export const KanbanStatus = Schema.Literals(["backlog", "ready", "in_progress", "done"]);
+export type KanbanStatus = typeof KanbanStatus.Type;
+
+export const KanbanTicket = Schema.Struct({
+  id: TrimmedNonEmptyString,
+  projectId: ProjectId,
+  title: TrimmedNonEmptyString,
+  description: Schema.String,
+  status: KanbanStatus,
+  position: Schema.Number,
+  threadId: Schema.NullOr(ThreadId),
+  createdAt: IsoDateTime,
+  updatedAt: IsoDateTime,
+});
+export type KanbanTicket = typeof KanbanTicket.Type;
+
+export const KanbanListInput = Schema.Struct({
+  projectId: ProjectId,
+});
+export type KanbanListInput = typeof KanbanListInput.Type;
+
+export const KanbanCreateInput = Schema.Struct({
+  projectId: ProjectId,
+  title: TrimmedNonEmptyString,
+  status: KanbanStatus.pipe(Schema.withDecodingDefault(() => "backlog" as const)),
+});
+export type KanbanCreateInput = typeof KanbanCreateInput.Type;
+
+export const KanbanUpdateInput = Schema.Struct({
+  id: TrimmedNonEmptyString,
+  title: Schema.optional(TrimmedNonEmptyString),
+  description: Schema.optional(Schema.String),
+  threadId: Schema.optional(Schema.NullOr(ThreadId)),
+});
+export type KanbanUpdateInput = typeof KanbanUpdateInput.Type;
+
+export const KanbanMoveInput = Schema.Struct({
+  id: TrimmedNonEmptyString,
+  status: KanbanStatus,
+  position: Schema.Number,
+});
+export type KanbanMoveInput = typeof KanbanMoveInput.Type;
+
+export const KanbanDeleteInput = Schema.Struct({
+  id: TrimmedNonEmptyString,
+});
+export type KanbanDeleteInput = typeof KanbanDeleteInput.Type;
+
+export const KANBAN_WS_METHODS = {
+  list: "kanban.list",
+  create: "kanban.create",
+  update: "kanban.update",
+  move: "kanban.move",
+  delete: "kanban.delete",
+} as const;
+
+export const KANBAN_WS_CHANNELS = {
+  updated: "kanban.updated",
+} as const;
+
+export const ConductorStatus = Schema.Literals([
+  "backlog",
+  "in_progress",
+  "in_review",
+  "done",
+  "cancelled",
+]);
+export type ConductorStatus = typeof ConductorStatus.Type;
+
 export const ORCHESTRATION_WS_METHODS = {
   getSnapshot: "orchestration.getSnapshot",
   dispatchCommand: "orchestration.dispatchCommand",
@@ -259,6 +330,7 @@ export const OrchestrationThread = Schema.Struct({
   interactionMode: ProviderInteractionMode.pipe(
     Schema.withDecodingDefault(() => DEFAULT_PROVIDER_INTERACTION_MODE),
   ),
+  conductorStatus: ConductorStatus.pipe(Schema.withDecodingDefault(() => "backlog" as const)),
   branch: Schema.NullOr(TrimmedNonEmptyString),
   worktreePath: Schema.NullOr(TrimmedNonEmptyString),
   latestTurn: Schema.NullOr(OrchestrationLatestTurn),
@@ -318,6 +390,7 @@ const ThreadCreateCommand = Schema.Struct({
   interactionMode: ProviderInteractionMode.pipe(
     Schema.withDecodingDefault(() => DEFAULT_PROVIDER_INTERACTION_MODE),
   ),
+  conductorStatus: ConductorStatus.pipe(Schema.withDecodingDefault(() => "backlog" as const)),
   branch: Schema.NullOr(TrimmedNonEmptyString),
   worktreePath: Schema.NullOr(TrimmedNonEmptyString),
   createdAt: IsoDateTime,
@@ -335,6 +408,7 @@ const ThreadMetaUpdateCommand = Schema.Struct({
   threadId: ThreadId,
   title: Schema.optional(TrimmedNonEmptyString),
   model: Schema.optional(TrimmedNonEmptyString),
+  conductorStatus: Schema.optional(ConductorStatus),
   branch: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   worktreePath: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
 });
@@ -618,6 +692,7 @@ export const ThreadCreatedPayload = Schema.Struct({
   interactionMode: ProviderInteractionMode.pipe(
     Schema.withDecodingDefault(() => DEFAULT_PROVIDER_INTERACTION_MODE),
   ),
+  conductorStatus: ConductorStatus.pipe(Schema.withDecodingDefault(() => "backlog" as const)),
   branch: Schema.NullOr(TrimmedNonEmptyString),
   worktreePath: Schema.NullOr(TrimmedNonEmptyString),
   createdAt: IsoDateTime,
@@ -633,6 +708,7 @@ export const ThreadMetaUpdatedPayload = Schema.Struct({
   threadId: ThreadId,
   title: Schema.optional(TrimmedNonEmptyString),
   model: Schema.optional(TrimmedNonEmptyString),
+  conductorStatus: Schema.optional(ConductorStatus),
   branch: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   worktreePath: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   updatedAt: IsoDateTime,
