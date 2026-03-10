@@ -42,7 +42,8 @@ export const RegisteredRepoRepositoryLive = Layer.effect(
 
     return {
       list: Effect.gen(function* () {
-        const rows = yield* sql`SELECT id, name, path, defaultBranch, addedAt FROM registered_repos ORDER BY addedAt DESC`;
+        const rows =
+          yield* sql`SELECT id, name, path, defaultBranch, addedAt FROM registered_repos ORDER BY addedAt DESC`;
         return rows.map((row) => Schema.decodeUnknownSync(RegisteredRepoRow)(row));
       }),
 
@@ -62,7 +63,8 @@ export const RegisteredRepoRepositoryLive = Layer.effect(
 
       getById: (id: string) =>
         Effect.gen(function* () {
-          const rows = yield* sql`SELECT id, name, path, defaultBranch, addedAt FROM registered_repos WHERE id = ${id}`;
+          const rows =
+            yield* sql`SELECT id, name, path, defaultBranch, addedAt FROM registered_repos WHERE id = ${id}`;
           if (rows.length === 0) return null;
           return Schema.decodeUnknownSync(RegisteredRepoRow)(rows[0]);
         }),

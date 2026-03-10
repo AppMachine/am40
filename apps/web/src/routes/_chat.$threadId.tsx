@@ -60,10 +60,7 @@ const DiffLoadingFallback = (props: { inline: boolean }) => {
   );
 };
 
-const RightPanelTabs = (props: {
-  activeTab: RightTab;
-  onTabChange: (tab: RightTab) => void;
-}) => {
+const RightPanelTabs = (props: { activeTab: RightTab; onTabChange: (tab: RightTab) => void }) => {
   const { activeTab, onTabChange } = props;
   return (
     <div className="flex shrink-0 border-b border-border">

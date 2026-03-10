@@ -611,23 +611,13 @@ export class ClaudeCodeProcessManager extends EventEmitter {
 
   private mapToolNameToItemType(
     toolName: string | undefined,
-  ):
-    | "command_execution"
-    | "file_change"
-    | "mcp_tool_call"
-    | "dynamic_tool_call"
-    | "unknown" {
+  ): "command_execution" | "file_change" | "mcp_tool_call" | "dynamic_tool_call" | "unknown" {
     if (!toolName) return "unknown";
     const lower = toolName.toLowerCase();
     if (lower === "bash" || lower === "execute" || lower.includes("command")) {
       return "command_execution";
     }
-    if (
-      lower === "edit" ||
-      lower === "write" ||
-      lower === "read" ||
-      lower.includes("file")
-    ) {
+    if (lower === "edit" || lower === "write" || lower === "read" || lower.includes("file")) {
       return "file_change";
     }
     if (lower.startsWith("mcp_") || lower.startsWith("mcp__")) {

@@ -632,9 +632,7 @@ export default function GitActionsControl({ gitCwd, activeThreadId }: GitActions
               result.status === "saved"
                 ? `Saved${result.commitSha ? ` ${result.commitSha.slice(0, 7)}` : ""}${result.pushed ? " & pushed" : ""}`
                 : "No changes to save",
-            ...(result.backupTag
-              ? { description: `Backup: ${result.backupTag}` }
-              : {}),
+            ...(result.backupTag ? { description: `Backup: ${result.backupTag}` } : {}),
             data: threadToastData,
           }),
           error: (err) => ({
@@ -871,12 +869,8 @@ export default function GitActionsControl({ gitCwd, activeThreadId }: GitActions
                       {item.id === "overwrite" && (
                         <TriangleAlertIcon className="size-3.5 text-warning" />
                       )}
-                      {item.id === "reset" && (
-                        <RotateCcwIcon className="size-3.5 text-warning" />
-                      )}
-                      <span className={item.destructive ? "text-warning" : ""}>
-                        {item.label}
-                      </span>
+                      {item.id === "reset" && <RotateCcwIcon className="size-3.5 text-warning" />}
+                      <span className={item.destructive ? "text-warning" : ""}>{item.label}</span>
                     </MenuItem>
                   ))}
                 </>
@@ -1127,11 +1121,7 @@ export default function GitActionsControl({ gitCwd, activeThreadId }: GitActions
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPendingDestructiveAction(null)}
-            >
+            <Button variant="outline" size="sm" onClick={() => setPendingDestructiveAction(null)}>
               Cancel
             </Button>
             <Button variant="destructive" size="sm" onClick={confirmDestructiveAction}>

@@ -727,7 +727,8 @@ export const createServer = Effect.fn(function* (): Effect.fn.Return<
       const snapshot = yield* projectionReadModelQuery.getSnapshot();
       const normalizedCwd = path.resolve(cwd);
       const existingProject = snapshot.projects.find(
-        (project) => path.resolve(project.workspaceRoot) === normalizedCwd && project.deletedAt === null,
+        (project) =>
+          path.resolve(project.workspaceRoot) === normalizedCwd && project.deletedAt === null,
       );
       let bootstrapProjectId: ProjectId;
       let bootstrapProjectDefaultModel: string;
@@ -1087,7 +1088,6 @@ export const createServer = Effect.fn(function* (): Effect.fn.Return<
         return { keybindings: keybindingsConfig, issues: [] };
       }
 
-
       // ── Kanban ──────────────────────────────────────────────────────
       case KANBAN_WS_METHODS.list: {
         const { projectId } = stripRequestTag(request.body);
@@ -1108,8 +1108,7 @@ export const createServer = Effect.fn(function* (): Effect.fn.Return<
           FROM projection_kanban_tickets
           WHERE projectId = ${projectId} AND status = ${status}
         `;
-        const position =
-          ((maxPosRows as ReadonlyArray<{ maxPos: number }>)[0]?.maxPos ?? 0) + 1;
+        const position = ((maxPosRows as ReadonlyArray<{ maxPos: number }>)[0]?.maxPos ?? 0) + 1;
         const ticket = {
           id,
           projectId,

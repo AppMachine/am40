@@ -144,7 +144,16 @@ function deriveProjectDisplayName(title: string, workspaceRoot: string): string 
   const basename = segments.at(-1);
   if (!basename) return title;
   // Generic basenames that are too ambiguous on their own — include parent for context
-  const GENERIC_NAMES = new Set(["server", "app", "web", "api", "client", "src", "packages", "apps"]);
+  const GENERIC_NAMES = new Set([
+    "server",
+    "app",
+    "web",
+    "api",
+    "client",
+    "src",
+    "packages",
+    "apps",
+  ]);
   if (GENERIC_NAMES.has(basename.toLowerCase()) && segments.length >= 2) {
     return `${segments[segments.length - 2]}/${basename}`;
   }

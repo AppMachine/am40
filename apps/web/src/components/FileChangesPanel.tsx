@@ -2,7 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { gitStatusQueryOptions } from "../lib/gitReactQuery";
 
-const EMPTY_FILES: readonly { readonly path: string; readonly deletions: number; readonly insertions: number }[] = [];
+const EMPTY_FILES: readonly {
+  readonly path: string;
+  readonly deletions: number;
+  readonly insertions: number;
+}[] = [];
 
 export function FileChangesPanel({ cwd }: { cwd: string | null }) {
   const { data: gitStatus } = useQuery(gitStatusQueryOptions(cwd));
@@ -42,9 +46,7 @@ export function FileChangesPanel({ cwd }: { cwd: string | null }) {
         {summary.additions > 0 && (
           <span className="ml-1.5 text-green-500">+{summary.additions}</span>
         )}
-        {summary.deletions > 0 && (
-          <span className="ml-1 text-red-500">-{summary.deletions}</span>
-        )}
+        {summary.deletions > 0 && <span className="ml-1 text-red-500">-{summary.deletions}</span>}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {files.map((file) => (
@@ -54,12 +56,8 @@ export function FileChangesPanel({ cwd }: { cwd: string | null }) {
           >
             <span className="min-w-0 flex-1 truncate text-foreground/80">{file.path}</span>
             <div className="flex shrink-0 items-center gap-1.5">
-              {file.insertions > 0 && (
-                <span className="text-green-500">+{file.insertions}</span>
-              )}
-              {file.deletions > 0 && (
-                <span className="text-red-500">-{file.deletions}</span>
-              )}
+              {file.insertions > 0 && <span className="text-green-500">+{file.insertions}</span>}
+              {file.deletions > 0 && <span className="text-red-500">-{file.deletions}</span>}
             </div>
           </div>
         ))}
