@@ -71,7 +71,7 @@ import {
 } from "./desktopUpdate.logic";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "./ui/alert";
 import { Button } from "./ui/button";
-import { Collapsible, CollapsibleContent } from "./ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import {
   SidebarContent,
@@ -1577,10 +1577,13 @@ export default function Sidebar() {
                           )}
                           {statusThreads.map((thread) => {
                             const isActive = routeThreadId === thread.id;
-                            const threadStatus = threadStatusPill(
+                            const threadStatus = resolveThreadStatusPill({
                               thread,
-                              pendingApprovalByThreadId.get(thread.id) === true,
-                            );
+                              hasPendingApprovals:
+                                pendingApprovalByThreadId.get(thread.id) === true,
+                              hasPendingUserInput:
+                                pendingUserInputByThreadId.get(thread.id) === true,
+                            });
                             const threadProject = projects.find((p) => p.id === thread.projectId);
                             const projectName = threadProject?.name ?? "Unknown";
                             return (
