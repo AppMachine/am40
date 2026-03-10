@@ -773,7 +773,6 @@ const buildDesktopArtifactCli = Command.make("build-desktop-artifact", {
 
 Command.run(buildDesktopArtifactCli, { version: "0.0.0" }).pipe(
   Effect.scoped,
-  // @ts-expect-error -- TS cannot resolve Exclude<Environment, NodeServices> to never (type alias not expanded)
   Effect.provide([Logger.layer([Logger.consolePretty()]), NodeServices.layer]),
   NodeRuntime.runMain,
 );

@@ -539,7 +539,6 @@ const devRunnerCli = Command.make("dev-runner", {
 if (import.meta.main) {
   Command.run(devRunnerCli, { version: "0.0.0" }).pipe(
     Effect.scoped,
-    // @ts-expect-error -- TS cannot resolve Exclude<Environment, NodeServices> to never (type alias not expanded)
     Effect.provide([Logger.layer([Logger.consolePretty()]), NodeServices.layer, NetService.layer]),
     NodeRuntime.runMain,
   );
