@@ -24,10 +24,7 @@ export interface GitScriptOpsShape {
   /**
    * Stage all, commit, and push. Creates a backup tag before committing.
    */
-  readonly save: (
-    cwd: string,
-    message?: string,
-  ) => Effect.Effect<GitSaveResult, GitCommandError>;
+  readonly save: (cwd: string, message?: string) => Effect.Effect<GitSaveResult, GitCommandError>;
 
   /**
    * Merge a source branch INTO the current branch.

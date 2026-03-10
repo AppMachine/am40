@@ -10,11 +10,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVerticalIcon, LinkIcon, PlusIcon, TrashIcon, XIcon } from "lucide-react";
 import type { KanbanStatus, KanbanTicket } from "@t3tools/contracts";
@@ -126,9 +122,7 @@ function QuickAddInput({
   const [value, setValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const createMutation = useMutation(
-    kanbanCreateMutationOptions({ projectId, queryClient }),
-  );
+  const createMutation = useMutation(kanbanCreateMutationOptions({ projectId, queryClient }));
 
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim();
@@ -310,9 +304,10 @@ export default function KanbanBoard({ projectId }: KanbanBoardProps) {
         // Dropped on a column droppable
         targetStatus = String(over.id) as KanbanStatus;
         const columnTickets = ticketsByStatus[targetStatus] ?? [];
-        targetPosition = columnTickets.length > 0
-          ? (columnTickets[columnTickets.length - 1]?.position ?? 0) + 1
-          : 1;
+        targetPosition =
+          columnTickets.length > 0
+            ? (columnTickets[columnTickets.length - 1]?.position ?? 0) + 1
+            : 1;
       }
 
       if (!targetStatus) return;

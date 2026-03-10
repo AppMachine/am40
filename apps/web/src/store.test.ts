@@ -157,6 +157,7 @@ describe("store pure functions", () => {
     const project2 = ProjectId.makeUnsafe("project-2");
     const project3 = ProjectId.makeUnsafe("project-3");
     const state: AppState = {
+      sidebarViewMode: "by-repo",
       projects: [
         {
           id: project1,
@@ -198,7 +199,7 @@ describe("store read model sync", () => {
     const initialState = makeState(makeThread());
     const readModel = makeReadModel(
       makeReadModelThread({
-        model: "claude-opus-4-6",
+        model: "totally-unknown-model-xyz",
       }),
     );
 
@@ -212,6 +213,7 @@ describe("store read model sync", () => {
     const project2 = ProjectId.makeUnsafe("project-2");
     const project3 = ProjectId.makeUnsafe("project-3");
     const initialState: AppState = {
+      sidebarViewMode: "by-repo",
       projects: [
         {
           id: project2,

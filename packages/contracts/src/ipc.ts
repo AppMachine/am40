@@ -64,12 +64,7 @@ import type {
   KanbanDeleteInput,
 } from "./orchestration";
 import { EditorId } from "./editor";
-import type {
-  RegisteredRepo,
-  RepoAddInput,
-  RepoRemoveInput,
-  RepoSetActiveInput,
-} from "./repo";
+import type { RegisteredRepo, RepoAddInput, RepoRemoveInput, RepoSetActiveInput } from "./repo";
 
 export interface ContextMenuItem<T extends string = string> {
   id: T;

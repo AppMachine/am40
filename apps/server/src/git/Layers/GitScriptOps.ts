@@ -78,11 +78,7 @@ const makeGitScriptOps = Effect.gen(function* () {
     runGit(operation, cwd, args, allowNonZeroExit).pipe(Effect.map((r) => r.stdout));
 
   const getCurrentBranch = (cwd: string): Effect.Effect<string | null, GitCommandError> =>
-    runGitStdout("GitScriptOps.getCurrentBranch", cwd, [
-      "rev-parse",
-      "--abbrev-ref",
-      "HEAD",
-    ]).pipe(
+    runGitStdout("GitScriptOps.getCurrentBranch", cwd, ["rev-parse", "--abbrev-ref", "HEAD"]).pipe(
       Effect.map((stdout) => {
         const branch = stdout.trim();
         return branch === "HEAD" || branch.length === 0 ? null : branch;
@@ -94,15 +90,10 @@ const makeGitScriptOps = Effect.gen(function* () {
       Effect.map((stdout) => stdout.trim()),
     );
 
-  const createTag = (
-    cwd: string,
-    tagName: string,
-  ): Effect.Effect<void, GitCommandError> =>
+  const createTag = (cwd: string, tagName: string): Effect.Effect<void, GitCommandError> =>
     runGit("GitScriptOps.createTag", cwd, ["tag", tagName]).pipe(Effect.asVoid);
 
-  const hasStagedConflictMarkers = (
-    cwd: string,
-  ): Effect.Effect<boolean, GitCommandError> =>
+  const hasStagedConflictMarkers = (cwd: string): Effect.Effect<boolean, GitCommandError> =>
     Effect.gen(function* () {
       const result = yield* runGit(
         "GitScriptOps.hasStagedConflictMarkers",
@@ -157,12 +148,7 @@ const makeGitScriptOps = Effect.gen(function* () {
       // Push (best-effort)
       let pushed = false;
       if (branch) {
-        const pushResult = yield* runGit(
-          "GitScriptOps.save.push",
-          cwd,
-          ["push"],
-          true,
-        );
+        const pushResult = yield* runGit("GitScriptOps.save.push", cwd, ["push"], true);
         if (pushResult.code === 0) {
           pushed = true;
         } else {
@@ -256,11 +242,10 @@ const makeGitScriptOps = Effect.gen(function* () {
         if (mergeResult.stdout.includes("Already up to date")) {
           return { status: "already_up_to_date" as const };
         }
-        const commitSha = yield* runGitStdout(
-          "GitScriptOps.mergeInto.revParse",
-          cwd,
-          ["rev-parse", targetBranch],
-        ).pipe(Effect.map((s) => s.trim()));
+        const commitSha = yield* runGitStdout("GitScriptOps.mergeInto.revParse", cwd, [
+          "rev-parse",
+          targetBranch,
+        ]).pipe(Effect.map((s) => s.trim()));
         return { status: "merged" as const, commitSha };
       }
 

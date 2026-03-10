@@ -15,6 +15,7 @@ De Claude Code provider was geregistreerd in het systeem maar werkte end-to-end 
 **Bestand:** `apps/web/src/composerDraftStore.ts:210-212`
 
 **Probleem:** De functie die provider-selectie persisteert in de composer draft store herkende alleen `"codex"`:
+
 ```typescript
 // VOOR (broken):
 function normalizeProviderKind(value: unknown): ProviderKind | null {
@@ -23,12 +24,15 @@ function normalizeProviderKind(value: unknown): ProviderKind | null {
 ```
 
 **Gevolg:** Wanneer de gebruiker Claude Code selecteerde in de UI, werd `composerDraft.provider` genormaliseerd naar `null`. In `ChatView.tsx:801` valt dit terug naar `"codex"`:
+
 ```typescript
 const selectedProvider: ProviderKind = lockedProvider ?? selectedProviderByThreadId ?? "codex";
 ```
+
 Dus elke turn werd met `provider: 'codex'` naar de server gestuurd, ongeacht wat de UI toonde.
 
 **Fix:**
+
 ```typescript
 function normalizeProviderKind(value: unknown): ProviderKind | null {
   return value === "codex" || value === "claude-code" ? (value as ProviderKind) : null;
@@ -42,6 +46,7 @@ function normalizeProviderKind(value: unknown): ProviderKind | null {
 **Bestand:** `apps/server/src/orchestration/Layers/ProviderCommandReactor.ts:215-216`
 
 **Probleem:** Bij het bepalen van de huidige provider van een thread-sessie werd alleen `"codex"` herkend:
+
 ```typescript
 // VOOR (broken):
 const currentProvider: ProviderKind | undefined =
@@ -49,14 +54,15 @@ const currentProvider: ProviderKind | undefined =
 ```
 
 **Gevolg:** Voor Claude Code sessies was `currentProvider` altijd `undefined`, waardoor:
+
 - `providerChanged` (regel 266) altijd `true` was -> sessie werd elke turn herstart
 - `getCapabilities()` (regel 269) werd nooit aangeroepen voor claude-code
 - `preferredProvider` (regel 217) negeerde de bestaande sessie-binding
 
 **Fix:**
+
 ```typescript
-const currentProvider: ProviderKind | undefined =
-  thread.session?.providerName ?? undefined;
+const currentProvider: ProviderKind | undefined = thread.session?.providerName ?? undefined;
 ```
 
 ---
@@ -66,22 +72,26 @@ const currentProvider: ProviderKind | undefined =
 **Bestand:** `apps/server/src/provider/Layers/ProviderSessionDirectory.ts:24-37`
 
 **Probleem:** De functie die provider names valideert bij het lezen uit de persistence laag herkende alleen `"codex"`:
+
 ```typescript
 // VOOR (broken):
 function decodeProviderKind(providerName: string, operation: string) {
   if (providerName === "codex") {
     return Effect.succeed(providerName);
   }
-  return Effect.fail(new ProviderSessionDirectoryPersistenceError({
-    operation,
-    detail: `Unknown persisted provider '${providerName}'.`,
-  }));
+  return Effect.fail(
+    new ProviderSessionDirectoryPersistenceError({
+      operation,
+      detail: `Unknown persisted provider '${providerName}'.`,
+    }),
+  );
 }
 ```
 
 **Gevolg:** Foutmelding `Unknown persisted provider 'claude-code'` wanneer een Claude Code sessie werd opgeslagen en later weer uitgelezen.
 
 **Fix:**
+
 ```typescript
 if (providerName === "codex" || providerName === "claude-code") {
   return Effect.succeed(providerName as ProviderKind);
@@ -95,6 +105,7 @@ if (providerName === "codex" || providerName === "claude-code") {
 **Bestand:** `apps/server/src/claudeCodeProcessManager.ts:325`
 
 **Probleem:** De Claude CLI vereist `--verbose` wanneer je `--output-format stream-json` met `--print` combineert:
+
 ```typescript
 // VOOR (broken):
 const args: string[] = ["--print", "--output-format", "stream-json"];
@@ -103,6 +114,7 @@ const args: string[] = ["--print", "--output-format", "stream-json"];
 **Gevolg:** Foutmelding `Error: When using --print, --output-format=stream-json requires --verbose`
 
 **Fix:**
+
 ```typescript
 const args: string[] = ["--print", "--output-format", "stream-json", "--verbose"];
 ```
@@ -126,6 +138,7 @@ De `result` event werd afgehandeld (sessie ging naar ready), maar de `assistant`
 **Gevolg:** Sessie draaide ~20 seconden, ging terug naar "ready" zonder error, maar er verscheen geen antwoord-bericht in de UI.
 
 **Fix:** Nieuw `assistant` case toegevoegd aan de switch in `handleStreamEvent`:
+
 ```typescript
 case "assistant": {
   const contentBlocks = event.message?.content;
@@ -259,11 +272,13 @@ Om modellen toe te voegen/wijzigen: bewerk `packages/contracts/src/model.ts` en 
 ## Provider Registratie
 
 De `ClaudeCodeAdapter` wordt automatisch geregistreerd in `apps/server/src/provider/Layers/ProviderAdapterRegistry.ts:30`:
+
 ```typescript
-const adapters = options?.adapters ?? [yield* CodexAdapter, yield* ClaudeCodeAdapter];
+const adapters = options?.adapters ?? [yield * CodexAdapter, yield * ClaudeCodeAdapter];
 ```
 
 De adapter wraps `ClaudeCodeProcessManager` en is gedefinieerd in:
+
 - Service interface: `apps/server/src/provider/Services/ClaudeCodeAdapter.ts`
 - Layer implementatie: `apps/server/src/provider/Layers/ClaudeCodeAdapter.ts`
 - Process manager: `apps/server/src/claudeCodeProcessManager.ts`
@@ -286,9 +301,9 @@ De adapter wraps `ClaudeCodeProcessManager` en is gedefinieerd in:
 
 ## Gewijzigde Bestanden (alleen Claude-gerelateerde fixes)
 
-| Bestand | Bug | Wijziging |
-|---------|-----|-----------|
-| `apps/web/src/composerDraftStore.ts` | #1 | `normalizeProviderKind` accepteert nu `"claude-code"` |
-| `apps/server/src/orchestration/Layers/ProviderCommandReactor.ts` | #2 | `currentProvider` leest `providerName` voor alle providers |
-| `apps/server/src/provider/Layers/ProviderSessionDirectory.ts` | #3 | `decodeProviderKind` accepteert nu `"claude-code"` |
-| `apps/server/src/claudeCodeProcessManager.ts` | #4, #5 | `--verbose` flag + `assistant` event handler |
+| Bestand                                                          | Bug    | Wijziging                                                  |
+| ---------------------------------------------------------------- | ------ | ---------------------------------------------------------- |
+| `apps/web/src/composerDraftStore.ts`                             | #1     | `normalizeProviderKind` accepteert nu `"claude-code"`      |
+| `apps/server/src/orchestration/Layers/ProviderCommandReactor.ts` | #2     | `currentProvider` leest `providerName` voor alle providers |
+| `apps/server/src/provider/Layers/ProviderSessionDirectory.ts`    | #3     | `decodeProviderKind` accepteert nu `"claude-code"`         |
+| `apps/server/src/claudeCodeProcessManager.ts`                    | #4, #5 | `--verbose` flag + `assistant` event handler               |

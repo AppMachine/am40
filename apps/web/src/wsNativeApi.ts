@@ -228,8 +228,7 @@ export function createWsNativeApi(): NativeApi {
       update: (input) => transport.request(KANBAN_WS_METHODS.update, input),
       move: (input) => transport.request(KANBAN_WS_METHODS.move, input),
       delete: (input) => transport.request(KANBAN_WS_METHODS.delete, input),
-      onUpdated: (callback) =>
-        transport.subscribe(KANBAN_WS_CHANNELS.updated, callback),
+      onUpdated: (callback) => transport.subscribe(KANBAN_WS_CHANNELS.updated, callback),
     },
   };
 

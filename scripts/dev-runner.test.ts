@@ -160,7 +160,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
 
     it.effect("advances until all required ports are available", () =>
       Effect.gen(function* () {
-        const taken = new Set([3773, 5733, 3774, 5734]);
+        const taken = new Set([4888, 6888, 4889, 6889]);
         const offset = yield* findFirstAvailableOffset({
           startOffset: 0,
           requireServerPort: true,
@@ -189,7 +189,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
   describe("resolveModePortOffsets", () => {
     it.effect("uses a shared fallback offset for dev mode", () =>
       Effect.gen(function* () {
-        const taken = new Set([3773, 5733]);
+        const taken = new Set([4888, 6888]);
         const offsets = yield* resolveModePortOffsets({
           mode: "dev",
           startOffset: 0,
@@ -204,7 +204,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
 
     it.effect("keeps server offset stable for dev:web and only shifts web offset", () =>
       Effect.gen(function* () {
-        const taken = new Set([5733]);
+        const taken = new Set([6888]);
         const offsets = yield* resolveModePortOffsets({
           mode: "dev:web",
           startOffset: 0,
@@ -219,7 +219,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
 
     it.effect("shifts only server offset for dev:server", () =>
       Effect.gen(function* () {
-        const taken = new Set([3773]);
+        const taken = new Set([4888]);
         const offsets = yield* resolveModePortOffsets({
           mode: "dev:server",
           startOffset: 0,

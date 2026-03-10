@@ -223,7 +223,10 @@ export function gitSaveMutationOptions(input: { cwd: string | null; queryClient:
     mutationFn: async (params?: { message?: string }) => {
       const api = ensureNativeApi();
       if (!input.cwd) throw new Error("Git save is unavailable.");
-      return api.git.save({ cwd: input.cwd, ...(params?.message ? { message: params.message } : {}) });
+      return api.git.save({
+        cwd: input.cwd,
+        ...(params?.message ? { message: params.message } : {}),
+      });
     },
     onSettled: async () => {
       await invalidateGitQueries(input.queryClient);

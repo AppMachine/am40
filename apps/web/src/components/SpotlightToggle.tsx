@@ -121,9 +121,7 @@ export default function SpotlightToggle({ activeThreadId }: SpotlightToggleProps
       <PopoverPopup tooltipStyle side="bottom" align="center">
         <div className="space-y-1">
           <p>{isActive ? "Spotlight active" : "Spotlight inactive"}</p>
-          {lastSyncLabel && (
-            <p className="text-xs text-muted-foreground">{lastSyncLabel}</p>
-          )}
+          {lastSyncLabel && <p className="text-xs text-muted-foreground">{lastSyncLabel}</p>}
         </div>
       </PopoverPopup>
     </Popover>

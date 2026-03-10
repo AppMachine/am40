@@ -48,10 +48,9 @@ export interface SpotlightServiceShape {
 /**
  * SpotlightService - Service tag for spotlight session management.
  */
-export class SpotlightService extends ServiceMap.Service<
-  SpotlightService,
-  SpotlightServiceShape
->()("t3/spotlight/SpotlightService") {}
+export class SpotlightService extends ServiceMap.Service<SpotlightService, SpotlightServiceShape>()(
+  "t3/spotlight/SpotlightService",
+) {}
 
 const makeSpotlightService = Effect.gen(function* () {
   const git = yield* GitService;

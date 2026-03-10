@@ -1,4 +1,9 @@
-import { type KanbanCreateInput, type KanbanMoveInput, type KanbanUpdateInput, ProjectId } from "@t3tools/contracts";
+import {
+  type KanbanCreateInput,
+  type KanbanMoveInput,
+  type KanbanUpdateInput,
+  ProjectId,
+} from "@t3tools/contracts";
 import { mutationOptions, queryOptions, type QueryClient } from "@tanstack/react-query";
 import { ensureNativeApi } from "~/nativeApi";
 
@@ -50,9 +55,7 @@ export function kanbanCreateMutationOptions(input: {
   });
 }
 
-export function kanbanUpdateMutationOptions(input: {
-  queryClient: QueryClient;
-}) {
+export function kanbanUpdateMutationOptions(input: { queryClient: QueryClient }) {
   return mutationOptions({
     mutationKey: ["kanban", "mutation", "update"] as const,
     mutationFn: async (params: KanbanUpdateInput) => {
@@ -65,9 +68,7 @@ export function kanbanUpdateMutationOptions(input: {
   });
 }
 
-export function kanbanMoveMutationOptions(input: {
-  queryClient: QueryClient;
-}) {
+export function kanbanMoveMutationOptions(input: { queryClient: QueryClient }) {
   return mutationOptions({
     mutationKey: ["kanban", "mutation", "move"] as const,
     mutationFn: async (params: KanbanMoveInput) => {
@@ -80,9 +81,7 @@ export function kanbanMoveMutationOptions(input: {
   });
 }
 
-export function kanbanDeleteMutationOptions(input: {
-  queryClient: QueryClient;
-}) {
+export function kanbanDeleteMutationOptions(input: { queryClient: QueryClient }) {
   return mutationOptions({
     mutationKey: ["kanban", "mutation", "delete"] as const,
     mutationFn: async (id: string) => {
